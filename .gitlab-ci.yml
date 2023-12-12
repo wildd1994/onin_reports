@@ -1,0 +1,32 @@
+include:
+  - project: 'develop_group1/infrastructure/ci-cd-template'
+    file: 'local-template.yml'
+
+variables:
+    CONTAINER_NAME: "report_onin_container_teststand"
+    IMAGE_TO_BUILD: "${REGISTRY_HOST}/report_onin:${CI_COMMIT_REF_SLUG}"
+
+stages:
+  - lint
+  - build
+  - deploy
+  - logs
+  - stop
+
+lint:
+  stage: lint
+  extends: .Check-PEP8-Stage-Build
+  only:
+    - new_version
+
+build:
+  stage: build
+  extends: .Build-Stage-Script
+
+deploy:
+  stage: deploy
+  extends: .Deploy-Stage-Script
+
+logs:
+  stage: logs
+  extends: .Get-Log-Stage-Script

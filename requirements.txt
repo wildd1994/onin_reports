@@ -1,0 +1,7 @@
+flask==2.0.2
+gunicorn
+logaugment
+pyrus-api==1.23.0
+app/pyrustools-0.4.4.48-py3-none-any.whl
+flake8
+Werkzeug==2.2.2
