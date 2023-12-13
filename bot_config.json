@@ -1,6 +1,6 @@
 {
 	"BOT_NAME": "OnInReportBot",
-	"ALLOW_FORMS": [1252988, 1173876,1296329, 1355914],
+	"ALLOW_FORMS": [1252988, 1173876,1296329],
 	"MAPPING_FOR_SERVICE_FIELD": {
 		"status": "Status"
 	},
@@ -8,5 +8,5 @@
 	"TOTAL_CODE": "total",
 	"REGISTRY_CODE": "registry",
 	"LOGGING": true,
-	"LOG_EMAIL": ""
+	"LOG_EMAIL": "pyrus_errors@onlineinterviewer.ru"
 }
