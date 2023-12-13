@@ -125,17 +125,42 @@ def get_tables(
                 client
             )
         columns = getattr(table.info, 'columns', [])
-        sorted_field_id = get_id_by_code(columns, 'total')
+        u_code_columns_list = []
+        sorted_fields = []
+        reverse = False
+        for col in columns:
+            code = getattr(col.info, 'code', None)  # Весь юкод
+            code_split = code.split('$')
+            code_name = code_split[0]  # До доллара
+            if len(code_split) > 1:
+                (code_sign, code_number,
+                 code_revers) = code_split[1].split('_')  # Сплитим после $
+                reverse = True if code_revers == 'DESC' else False
+                if code_sign == 'SRT':
+                    sorted_fields.append(
+                        {
+                            'number': code_number,
+                            'id': getattr(col, 'id', None)
+                        }
+                    )
+            u_code_columns_list.append(  # Переделал чтобы не занулялись поля
+                {
+                    'u_code': code_name,
+                    'id': getattr(col, 'id', None),
+                    'name': getattr(col, 'name', None)
+                }
+            )
+        sorted_fields.sort(key=lambda x: int(x['number']))
         # Обрабатываем первый столбец
         rows, filtered_tasks = prepare_first_col(
-            columns[0],
+            u_code_columns_list[0],
             form.flat_fields_static,
             tasks,
             config
         )
         # Обрабатываем остальные столбцы
         prepare_other_col(
-            columns[1::],
+            u_code_columns_list[1::],
             form.flat_fields_static,
             rows,
             filtered_tasks,
@@ -144,15 +169,15 @@ def get_tables(
             registry_part
         )
         # Формируем строки
-        if sorted_field_id:
-            sort_table(rows, sorted_field_id)
+        if sorted_fields:
+            sort_table(rows, sorted_fields, reverse)
         rows_ent = utils.get_rows(rows)
         tables[table.id] = rows_ent
     return tables
 
 
 def prepare_first_col(
-        first_col: FormFieldPlus,
+        first_col: dict,
         source_form_fields: [FormFieldPlus],
         tasks: [ent.Task],
         config: BotConfig
@@ -161,7 +186,8 @@ def prepare_first_col(
 
     Обработка первого столбца.
 
-    :param first_col: первый столбец таблицы
+    :param first_col: первый столбец таблицы в виде словаря
+     (словарь с ключами {'u_code', 'id', 'name'})
     :param source_form_fields: список полей формы
     :param tasks: список задач из реестра
     :param config: конфигурационный файл
@@ -171,10 +197,10 @@ def prepare_first_col(
     rows = []
     # Получаем юкод из столбца,
     # значение которого будем раскладывать в вертикаль
-    code_source = getattr(first_col.info, 'code', None)
+    code_source = first_col.get('u_code', None)
     if code_source in config.mapping_service_code:
         code_source = config.mapping_service_code.get(code_source)
-    first_col_id = first_col.id
+    first_col_id = first_col.get('id', None)
     if code_source is None:
         return rows, res
     # Получаем id поля по юкоду из столбца
@@ -212,7 +238,8 @@ def prepare_other_col(
 
     Обработка дефолтных столбцов.
 
-    :param columns: список колонок
+    :param columns: список словарей колонок
+    (словарь с ключами {'u_code', 'id', 'name'})
     :param source_form_fields: список полей формы
     :param rows: строки для будущей таблицы
     :param tasks_by_item: отсортированные задачи
@@ -224,12 +251,12 @@ def prepare_other_col(
     # Остальные колонки присоединяем к строкам,
     # которые им соответствуют (в том порядке, в котором они идут)
     for col in columns:
-        code_source = getattr(col.info, 'code', None)
+        code_source = col.get('u_code', None)
         # Если служебный код, меняем его
         if code_source in config.mapping_service_code:
             code_source = config.mapping_service_code.get(code_source)
         source_field_id = get_id_by_code(source_form_fields, code_source)
-        source_value_for_common = col.name
+        source_value_for_common = col.get('name', None)
         i = 0
         for meta, tasks in tasks_by_item.items():
             # Служебная итоговая колонка
@@ -249,7 +276,7 @@ def prepare_other_col(
                         tasks, source_value_for_common, source_field_id
                     )
                 )
-            rows[i][col.id] = value
+            rows[i][col['id']] = value
             i += 1
 
 
@@ -259,7 +286,7 @@ def get_additional_filters(
 ) -> dict:
     """
 
-    Получаем фишльтры из таблицы.
+    Получаем фильтры из таблицы.
 
     :param task_fields: список полей задачи
     :param code_add_filter: код таблицы с фильтрами
@@ -331,15 +358,21 @@ def to_filter_add(
     return tasks, registry_link
 
 
-def sort_table(rows: list, field_id: int) -> None:
+def sort_table(rows: list, fields_ids: list, reverse: bool = False) -> None:
     """
 
     Сортировка таблиц по полю итого.
 
     :param rows: строки которые надо отсортировать
-    :param field_id id поля по которому сортируется
+    :param fields_ids список словарей с ключами {'number', 'id'}
+    полей по которым сортируются строки
+    :param reverse True or False тип сортировки
     :return: None модифицируем исходный массив
     """
     last_row = rows.pop(-1)
-    rows.sort(key=lambda item: item.get(field_id), reverse=True)
+    sort_ids_list = [cell['id'] for cell in fields_ids]
+    rows.sort(
+        key=lambda item: [item.get(idd) for idd in sort_ids_list],
+        reverse=reverse
+    )
     rows.append(last_row)
