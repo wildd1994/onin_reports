@@ -58,6 +58,12 @@ def process_reports(
     # Получаем id поля, по которому будем сортировать
     # Получаем новые таблицы
     new_tables = get_tables(res, client, config, filters_to_id)
+    if not new_tables:
+        client.comment_task_plus(
+            task_id=task.id,
+            text='Сортировать можно только числа! Поправьте конфигурацию'
+        )
+        return
     # Переписываем таблицы
     rewrite_tables(client, new_tables, task)
 
@@ -82,12 +88,51 @@ def rewrite_tables(
     utils.comment_tables(client, tables, task.id)
 
 
+def forming_columns_for_sort(columns: list[FormFieldPlus]) -> (list, list):
+    """
+    Функция формирует структуру для дальнейшей правильной сортировки
+
+    :param columns: список обьектов колонок
+    :return:
+        u_code_columns_list: список словарей с ключами {'u_code', 'id', 'name'}
+         для 'оригинальных' колонок, чтобы избежать зануления текущих колонок
+        sorted_fields: список словарей с ключами {'id', 'number', 'reverse'}
+         полей сортировки
+    """
+    u_code_columns_list = []
+    sorted_fields = []
+    for col in columns:
+        code = getattr(col.info, 'code', None)  # Весь юкод
+        code_split = code.split('$')
+        code_name = code_split[0]  # До доллара
+        if len(code_split) == 2:
+            (code_sign, code_number,
+             code_revers) = code_split[1].split('_')  # Сплитим после $
+            if code_sign == 'SRT':
+                sorted_fields.append(
+                    {
+                        'number': code_number,
+                        'id': getattr(col, 'id', None),
+                        'reverse': True if code_revers == 'DESC' else False
+                    }
+                )
+        u_code_columns_list.append(  # Переделал чтобы не занулялись поля
+            {
+                'u_code': code_name,
+                'id': getattr(col, 'id', None),
+                'name': getattr(col, 'name', None)
+            }
+        )
+    sorted_fields.sort(key=lambda x: int(x['number']))
+    return u_code_columns_list, sorted_fields
+
+
 def get_tables(
         field_table_to_form_id: dict,
         client: MyPyrus,
         config: BotConfig,
         filters: dict
-) -> dict:
+) -> (dict, None):
     """
 
     Получение таблиц для записи.
@@ -97,7 +142,7 @@ def get_tables(
     :param client: сущность клиента pyrus
     :param config: конфигурационный файл
     :param filters: дополнительные фильтры для таблиц
-    :return: словарь таблиц вида {id таблицы: строки для записи в неё}
+    :return: словарь таблиц вида {id таблицы: строки для записи в неё}, None
     """
     cache = {}
     tables = {}
@@ -125,32 +170,11 @@ def get_tables(
                 client
             )
         columns = getattr(table.info, 'columns', [])
-        u_code_columns_list = []
-        sorted_fields = []
-        reverse = False
-        for col in columns:
-            code = getattr(col.info, 'code', None)  # Весь юкод
-            code_split = code.split('$')
-            code_name = code_split[0]  # До доллара
-            if len(code_split) > 1:
-                (code_sign, code_number,
-                 code_revers) = code_split[1].split('_')  # Сплитим после $
-                reverse = True if code_revers == 'DESC' else False
-                if code_sign == 'SRT':
-                    sorted_fields.append(
-                        {
-                            'number': code_number,
-                            'id': getattr(col, 'id', None)
-                        }
-                    )
-            u_code_columns_list.append(  # Переделал чтобы не занулялись поля
-                {
-                    'u_code': code_name,
-                    'id': getattr(col, 'id', None),
-                    'name': getattr(col, 'name', None)
-                }
-            )
-        sorted_fields.sort(key=lambda x: int(x['number']))
+        u_code_columns_list, sorted_fields = forming_columns_for_sort(columns)
+        for coll in sorted_fields:
+            if object_by_id(columns, coll['id']).type != 'number':
+                logger.debug(msg='Сортировать можно только числа!')
+                return
         # Обрабатываем первый столбец
         rows, filtered_tasks = prepare_first_col(
             u_code_columns_list[0],
@@ -170,7 +194,7 @@ def get_tables(
         )
         # Формируем строки
         if sorted_fields:
-            sort_table(rows, sorted_fields, reverse)
+            sort_table(rows, sorted_fields)
         rows_ent = utils.get_rows(rows)
         tables[table.id] = rows_ent
     return tables
@@ -358,21 +382,22 @@ def to_filter_add(
     return tasks, registry_link
 
 
-def sort_table(rows: list, fields_ids: list, reverse: bool = False) -> None:
+def sort_table(rows: list, fields: list) -> None:
     """
 
     Сортировка таблиц по полю итого.
 
     :param rows: строки которые надо отсортировать
-    :param fields_ids список словарей с ключами {'number', 'id'}
+    :param fields список словарей с ключами {'id', 'number', 'reverse'}
     полей по которым сортируются строки
-    :param reverse True or False тип сортировки
     :return: None модифицируем исходный массив
     """
     last_row = rows.pop(-1)
-    sort_ids_list = [cell['id'] for cell in fields_ids]
+    sort_ids_list = [
+        -cell['id'] if cell['reverse'] else cell['id'] for cell in fields
+    ]
     rows.sort(
-        key=lambda item: [item.get(idd) for idd in sort_ids_list],
-        reverse=reverse
+        key=lambda item: [item.get(idd) if idd > 0 else -item.get(abs(idd))
+                          for idd in sort_ids_list]
     )
     rows.append(last_row)
