@@ -298,7 +298,7 @@ def prepare_other_col(
                 value = len(
                     utils.filter_tasks(
                         tasks, source_value_for_common, source_field_id
-                    )
+                    )[0]
                 )
             rows[i][col['id']] = value
             i += 1
@@ -368,7 +368,11 @@ def to_filter_add(
         # Получаем поле из шаблона форма
         filter_field = object_by_code(form_fields, filter_field_code)
         # фильтруем задачи
-        tasks = utils.filter_tasks(tasks, filter_value, filter_field.id)
+        tasks, filter_value = utils.filter_tasks(
+            tasks,
+            filter_value,
+            filter_field.id
+        )
         # получаем ссылку на реестр
         key_registry, value_registry = utils.prepare_registry_from_form(
             filter_field,

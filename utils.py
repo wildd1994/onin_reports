@@ -180,6 +180,7 @@ def prepare_registry_from_form(
             val_reg = 'false'
     if field.type == 'step':
         key_reg = 'tst'
+        val_reg = value
     return f'{key_reg}{field.id}', val_reg
 
 
@@ -236,7 +237,7 @@ def filter_tasks(
         tasks: [ent.Task],
         filtered_value: Any,
         filtered_field_id: int
-) -> list:
+) -> tuple:
     """
 
     Фильтрация задач по знаечению.
@@ -247,25 +248,32 @@ def filter_tasks(
     :return: список отфильтрованных задач
     """
     filtered_value = [elem.strip() for elem in filtered_value.split(',')]
+    result_filter_value = []
     # Фильтрация задач по значению
     filtered_tasks = []
-    for number in filtered_value:
-        if '-' in number:
-            start, end = [elem.strip() for elem in number.split('-')]
+    for value in filtered_value:
+        if '-' in value:
+            start, end = [elem.strip() for elem in value.split('-')]
             filtered_tasks += [
                 task for task in tasks
                 if int(prepare_value(
                     object_by_id(task.flat_fields, filtered_field_id)
                 )) in range(int(start), int(end) + 1)
             ]
+            value_index = filtered_value.index(value)
+            result_filter_value += filtered_value[:value_index]  # До элемента с '-'
+            result_filter_value += list(range(int(start), int(end) + 1))  # Последовательность чисел из интервала
+            result_filter_value += filtered_value[len(result_filter_value):]  # После элемента с '-'
+            result_filter_value = [str(elem) for elem in result_filter_value]
         else:
             filtered_tasks += [
                 task for task in tasks
-                if number == prepare_value(
+                if value == prepare_value(
                     object_by_id(task.flat_fields, filtered_field_id)
                 )
             ]
-    return filtered_tasks
+            result_filter_value.append(value)
+    return filtered_tasks, ','.join(result_filter_value)
 
 
 def get_rows(rows: [dict]) -> [ent.TableRow]:
