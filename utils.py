@@ -246,22 +246,25 @@ def filter_tasks(
     :param filtered_field_id: id поля по которому фильтруются задачи
     :return: список отфильтрованных задач
     """
+    filtered_value = [elem.strip() for elem in filtered_value.split(',')]
     # Фильтрация задач по значению
-    if '-' in filtered_value:
-        start, end = filtered_value.split('-')
-        filtered_tasks = [
-            task for task in tasks
-            if int(prepare_value(
-                object_by_id(task.flat_fields, filtered_field_id)
-            )) in range(int(start), int(end) + 1)
-        ]
-        return filtered_tasks
-    filtered_tasks = [
-        task for task in tasks
-        if filtered_value == prepare_value(
-            object_by_id(task.flat_fields, filtered_field_id)
-        )
-    ]
+    filtered_tasks = []
+    for number in filtered_value:
+        if '-' in number:
+            start, end = [elem.strip() for elem in number.split('-')]
+            filtered_tasks += [
+                task for task in tasks
+                if int(prepare_value(
+                    object_by_id(task.flat_fields, filtered_field_id)
+                )) in range(int(start), int(end) + 1)
+            ]
+        else:
+            filtered_tasks += [
+                task for task in tasks
+                if number == prepare_value(
+                    object_by_id(task.flat_fields, filtered_field_id)
+                )
+            ]
     return filtered_tasks
 
 
