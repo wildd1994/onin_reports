@@ -247,6 +247,15 @@ def filter_tasks(
     :return: список отфильтрованных задач
     """
     # Фильтрация задач по значению
+    if '-' in filtered_value:
+        start, end = filtered_value.split('-')
+        filtered_tasks = [
+            task for task in tasks
+            if int(prepare_value(
+                object_by_id(task.flat_fields, filtered_field_id)
+            )) in range(int(start), int(end) + 1)
+        ]
+        return filtered_tasks
     filtered_tasks = [
         task for task in tasks
         if filtered_value == prepare_value(
