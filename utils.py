@@ -260,10 +260,15 @@ def filter_tasks(
                     object_by_id(task.flat_fields, filtered_field_id)
                 )) in range(int(start), int(end) + 1)
             ]
+            # Индекс элемента, содержащего "-"
             value_index = filtered_value.index(value)
-            result_filter_value += filtered_value[:value_index]  # До элемента с '-'
-            result_filter_value += list(range(int(start), int(end) + 1))  # Последовательность чисел из интервала
-            result_filter_value += filtered_value[len(result_filter_value):]  # После элемента с '-'
+            # До элемента с '-'
+            result_filter_value += filtered_value[:value_index]
+            # Последовательность чисел из интервала
+            result_filter_value += list(range(int(start), int(end) + 1))
+            # После элемента с '-'
+            result_filter_value += filtered_value[len(result_filter_value):]
+            #  Все элементы к строковому типу
             result_filter_value = [str(elem) for elem in result_filter_value]
         else:
             filtered_tasks += [

@@ -374,13 +374,19 @@ def to_filter_add(
             filter_field.id
         )
         # получаем ссылку на реестр
-        key_registry, value_registry = utils.prepare_registry_from_form(
-            filter_field,
-            filter_value,
-            client
-        )
-        if key_registry:
-            registry_dict[key_registry] = value_registry
+
+        value_reg = []
+        key_reg = []
+        for value in filter_value.split(','):
+            key_registry, value_registry = utils.prepare_registry_from_form(
+                filter_field,
+                value,
+                client
+            )
+            value_reg.append(str(value_registry))
+            key_reg.append(key_registry)
+        if key_reg[-1]:
+            registry_dict[key_reg[-1]] = ','.join(value_reg)
     # формируем ссылку
     registry_link = urllib.parse.urlencode(registry_dict)
     return tasks, registry_link
